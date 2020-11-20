@@ -37,25 +37,13 @@ pipeline {
             chmod u+x ./eksctl ./kubectl
             ls -l ./eksctl ./kubectl
           """
-
-          // All this complexity to get the EC2 instance role and then attach the policy for CW Metrics
-          roleArn = sh(returnStdout: true, 
-            script: """
-              aws eks describe-nodegroup --nodegroup-name eks-${params.cluster}-0 --cluster-name eks-${params.cluster} --query nodegroup.nodeRole --output text
-            """).trim()
-          role = roleArn.split('/')[1]
-
-          sh """
-            aws iam attach-role-policy --role-name ${role} --policy-arn arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
-          """
-          println role
         }
       }
     }
 
     stage('Create') {
       when {
-        expression { params.action == 'createa' }
+        expression { params.action == 'create' }
       }
       steps {
         script {
@@ -102,7 +90,7 @@ pipeline {
 
     stage('Cluster setup') {
       when {
-        expression { params.action == 'createa' }
+        expression { params.action == 'create' }
       }
       steps {
         script {
@@ -115,19 +103,31 @@ pipeline {
               aws eks update-kubeconfig --name eks-${params.cluster} --region ${params.region}
             """
 
-            // The recently introduced CW Metrics and Container Insights
+            // The recently introduced CW Metrics and Container Insights setup
             // https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Container-Insights-prerequisites.html
             // https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Container-Insights-setup-EKS-quickstart.html
-            // eksctl does not support CW metrics, so we need to tweak the EC2 instance role to allow it to work.
+            // eksctl does not support CW metrics currently, so we need to tweak the EC2 instance role to allow it to work.
             // See this for the issue: https://github.com/weaveworks/eksctl/issues/811#issuecomment-731266712
             if (params.cloudwatch == true) {
-              echo "Setting up Cloudwatch metrics and Container Insights."
+              echo "Setting up Cloudwatch logs, metrics and Container Insights."
+
               sh """
                 curl --silent https://raw.githubusercontent.com/aws-samples/amazon-cloudwatch-container-insights/latest/k8s-deployment-manifest-templates/deployment-mode/daemonset/container-insights-monitoring/quickstart/cwagent-fluentd-quickstart.yaml | \\
                   sed "s/{{cluster_name}}/eks-${params.cluster}/;s/{{region_name}}/${params.region}/" | \\
                   ./kubectl apply -f -
               """
 
+              // All this complexity to get the EC2 instance role and then attach the policy for CW Metrics
+              roleArn = sh(returnStdout: true, 
+                script: """
+                aws eks describe-nodegroup --nodegroup-name eks-${params.cluster}-0 --cluster-name eks-${params.cluster} --query nodegroup.nodeRole --output text
+                """).trim()
+
+              role = roleArn.split('/')[1]
+
+              sh """
+                aws iam attach-role-policy --role-name ${role} --policy-arn arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+              """
             }
 
             if (params.ca == true) {
