@@ -7,3 +7,7 @@ The differences between `terraform` and `eksctl`? `terraform` is from Hashicorp 
 You can see my notes on Fargate [here](https://github.com/spicysomtam/jenkins-deploy-eks-via-terraform#introduction); at this time Fargate is not a realistic option for EKS, so autoscaling node groups are used instead (EC2 instances).
 
 There are lots of options for `eksctl`; most of this is documented at [eksctl.io](https://eksctl.io), although you might want to issue `--help` against the latest binary to see what options are available.
+
+I kept the Cluster Autoscaler and Cloudwatch logs/metrics/container insights. These all work as per the `terraform` solution.
+
+![Screenshot of the parameters](Jenkins.png)
