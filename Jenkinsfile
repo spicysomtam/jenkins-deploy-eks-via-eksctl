@@ -30,9 +30,11 @@ pipeline {
         script {
           currentBuild.displayName = "#" + env.BUILD_NUMBER + " " + params.action + " eks-" + params.cluster
 
-          println "Getting the eksctl binary..."
+          println "Getting the kubectl and eksctl binaries..."
           sh """
             curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_\$(uname -s)_amd64.tar.gz" | tar xzvf -
+            curl -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.18.9/2020-11-02/bin/linux/amd64/kubectl
+            chmod u+x ./kubectl
           """
         }
       }
@@ -53,13 +55,14 @@ pipeline {
             
             sh """
               ./eksctl create cluster \
-                --name eks-${params.name} \
+                --name eks-${params.cluster} \
                 --version ${params.k8s_version} \
                 --region  ${params.region} \
-                --nodegroup-name eks-${params.name}-0 \
+                --nodegroup-name eks-${params.cluster}-0 \
                 --nodes ${params.num_workers} \
                 --nodes-min ${params.num_workers} \
                 --nodes-max ${params.max_workers} \
+                --nodes-type ${params.instance_type} \
                 --with-oidc \
                 --ssh-access \
                 --ssh-public-key ${params.key_pair} \
@@ -86,10 +89,10 @@ pipeline {
               aws eks update-kubeconfig --name eks-${params.cluster} --region ${params.region}
 
               # Add configmap aws-auth if its not there:
-              if [ ! "\$(kubectl -n kube-system get cm aws-auth 2> /dev/null)" ]
+              if [ ! "\$(./kubectl -n kube-system get cm aws-auth 2> /dev/null)" ]
               then
                 echo "Adding aws-auth configmap to ns kube-system..."
-                terraform output config_map_aws_auth | awk '!/^\$/' | kubectl apply -f -
+                terraform output config_map_aws_auth | awk '!/^\$/' | ./kubectl apply -f -
               else
                 true # jenkins likes happy endings!
               fi
@@ -100,7 +103,7 @@ pipeline {
               sh """
                 curl https://raw.githubusercontent.com/aws-samples/amazon-cloudwatch-container-insights/latest/k8s-deployment-manifest-templates/deployment-mode/daemonset/container-insights-monitoring/quickstart/cwagent-fluentd-quickstart.yaml | \\
                   sed "s/{{cluster_name}}/eks-${params.cluster}/;s/{{region_name}}/${params.region}/" | \\
-                  kubectl apply -f -
+                  ./kubectl apply -f -
               """
             }
 
@@ -133,14 +136,14 @@ pipeline {
 
               // Setup documented here: https://docs.aws.amazon.com/eks/latest/userguide/cluster-autoscaler.html
               sh """
-                kubectl apply -f https://raw.githubusercontent.com/kubernetes/autoscaler/master/cluster-autoscaler/cloudprovider/aws/examples/cluster-autoscaler-autodiscover.yaml
-                kubectl -n kube-system annotate deployment.apps/cluster-autoscaler cluster-autoscaler.kubernetes.io/safe-to-evict="false"
-                kubectl -n kube-system get deployment.apps/cluster-autoscaler -o json | \\
+                ./kubectl apply -f https://raw.githubusercontent.com/kubernetes/autoscaler/master/cluster-autoscaler/cloudprovider/aws/examples/cluster-autoscaler-autodiscover.yaml
+                ./kubectl -n kube-system annotate deployment.apps/cluster-autoscaler cluster-autoscaler.kubernetes.io/safe-to-evict="false"
+                ./kubectl -n kube-system get deployment.apps/cluster-autoscaler -o json | \\
                   jq | \\
                   sed 's/<YOUR CLUSTER NAME>/eks-${params.cluster}/g' | \\
                   jq '.spec.template.spec.containers[0].command += ["--balance-similar-node-groups","--skip-nodes-with-system-pods=false"]' | \\
-                  kubectl apply -f -
-                kubectl -n kube-system set image deployment.apps/cluster-autoscaler cluster-autoscaler=${gregion}.gcr.io/k8s-artifacts-prod/autoscaling/cluster-autoscaler:v${params.k8s_version}.${tag}
+                  ./kubectl apply -f -
+                ./kubectl -n kube-system set image deployment.apps/cluster-autoscaler cluster-autoscaler=${gregion}.gcr.io/k8s-artifacts-prod/autoscaling/cluster-autoscaler:v${params.k8s_version}.${tag}
               """
             }
 
@@ -165,7 +168,7 @@ pipeline {
 
             sh """
               ./eksctl delete cluster \
-                --name eks-${params.name} \
+                --name eks-${params.cluster} \
                 --region ${params.region} \
                 --wait
             """
