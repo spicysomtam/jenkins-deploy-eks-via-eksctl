@@ -73,7 +73,6 @@ pipeline {
       }
     }
 
-    /* 
     stage('Cluster setup') {
       when {
         expression { params.action == 'create' }
@@ -87,15 +86,6 @@ pipeline {
             
             sh """
               aws eks update-kubeconfig --name eks-${params.cluster} --region ${params.region}
-
-              # Add configmap aws-auth if its not there:
-              if [ ! "\$(./kubectl -n kube-system get cm aws-auth 2> /dev/null)" ]
-              then
-                echo "Adding aws-auth configmap to ns kube-system..."
-                terraform output config_map_aws_auth | awk '!/^\$/' | ./kubectl apply -f -
-              else
-                true # jenkins likes happy endings!
-              fi
             """
 
             if (params.cloudwatch == true) {
@@ -151,7 +141,6 @@ pipeline {
         }
       }
     }
-    */
 
     stage('Destroy') {
       when {
