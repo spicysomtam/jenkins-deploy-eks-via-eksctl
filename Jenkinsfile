@@ -37,8 +37,11 @@ pipeline {
             chmod u+x ./eksctl ./kubectl
             ls -l ./eksctl ./kubectl
           """
+
           roleArn = sh(returnStdout: true, 
-            script: "aws eks describe-nodegroup --nodegroup-name eks-${params.cluster}-0 --cluster-name eks-${params.cluster} --query nodegroup.nodeRole --output text").trim()
+            script: """
+              aws eks describe-nodegroup --nodegroup-name eks-${params.cluster}-0 --cluster-name eks-${params.cluster} --query nodegroup.nodeRole --output text
+            """).trim()
           role = roleArn.split('/')[1]
           println role
         }
