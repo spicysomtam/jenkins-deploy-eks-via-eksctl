@@ -32,7 +32,7 @@ pipeline {
 
           println "Getting the eksctl binary..."
           sh """
-            curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xzvf -
+            curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_\$(uname -s)_amd64.tar.gz" | tar xzvf -
           """
         }
       }
