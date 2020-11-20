@@ -32,9 +32,10 @@ pipeline {
 
           println "Getting the kubectl and eksctl binaries..."
           sh """
-            curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_\$(uname -s)_amd64.tar.gz" | tar xzvf -
+            curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_\$(uname -s)_amd64.tar.gz" | tar xzf -
             curl --silent -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.18.9/2020-11-02/bin/linux/amd64/kubectl
             chmod u+x ./kubectl
+            ls -l ./eksctl ./kubectl
           """
         }
       }
@@ -78,7 +79,7 @@ pipeline {
 
             if (params.cloudwatch == true) {
               sh """
-                eksctl utils update-cluster-logging --enable-types all --approve --cluster eks-${params.cluster}
+                ./eksctl utils update-cluster-logging --enable-types all --approve --cluster eks-${params.cluster}
               """
             }
           }
