@@ -38,11 +38,16 @@ pipeline {
             ls -l ./eksctl ./kubectl
           """
 
+          // All this complexity to get the EC2 instance role and then attach the policy for CW Metrics
           roleArn = sh(returnStdout: true, 
             script: """
               aws eks describe-nodegroup --nodegroup-name eks-${params.cluster}-0 --cluster-name eks-${params.cluster} --query nodegroup.nodeRole --output text
             """).trim()
           role = roleArn.split('/')[1]
+
+          sh """
+            aws iam attach-role-policy --role-name ${role} --policy-arn arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+          """
           println role
         }
       }
