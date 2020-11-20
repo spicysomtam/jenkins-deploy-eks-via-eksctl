@@ -188,6 +188,21 @@ pipeline {
             accessKeyVariable: 'AWS_ACCESS_KEY_ID',  
             secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
 
+            if (params.cloudwatch == true) {
+               // All this complexity to get the EC2 instance role and then dettach the policy for CW Metrics
+               // We need to detach before running eksctl otherwise eksctl will fail to delete
+              roleArn = sh(returnStdout: true, 
+                script: """
+                aws eks describe-nodegroup --nodegroup-name eks-${params.cluster}-0 --cluster-name eks-${params.cluster} --query nodegroup.nodeRole --output text
+                """).trim()
+
+              role = roleArn.split('/')[1]
+
+              sh """
+                aws iam dettach-role-policy --role-name ${role} --policy-arn arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+              """
+            }
+
             sh """
               ./eksctl delete cluster \
                 --name eks-${params.cluster} \
