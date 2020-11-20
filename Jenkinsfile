@@ -62,7 +62,7 @@ pipeline {
                 --nodes ${params.num_workers} \
                 --nodes-min ${params.num_workers} \
                 --nodes-max ${params.max_workers} \
-                --nodes-type ${params.instance_type} \
+                --node-type ${params.instance_type} \
                 --with-oidc \
                 --ssh-access \
                 --ssh-public-key ${params.key_pair} \
