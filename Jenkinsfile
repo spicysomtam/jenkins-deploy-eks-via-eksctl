@@ -34,7 +34,7 @@ pipeline {
           sh """
             curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_\$(uname -s)_amd64.tar.gz" | tar xzf -
             curl --silent -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.18.9/2020-11-02/bin/linux/amd64/kubectl
-            chmod u+x ./kubectl
+            chmod u+x ./eksctl ./kubectl
             ls -l ./eksctl ./kubectl
           """
         }
