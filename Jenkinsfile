@@ -33,7 +33,7 @@ pipeline {
           println "Getting the kubectl and eksctl binaries..."
           sh """
             curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_\$(uname -s)_amd64.tar.gz" | tar xzvf -
-            curl -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.18.9/2020-11-02/bin/linux/amd64/kubectl
+            curl --silent -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.18.9/2020-11-02/bin/linux/amd64/kubectl
             chmod u+x ./kubectl
           """
         }
@@ -53,6 +53,12 @@ pipeline {
           accessKeyVariable: 'AWS_ACCESS_KEY_ID',  
           secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
             
+            ca_args=""
+
+            if (params.ca == true) {
+                ca_args="--asg-access" 
+            }
+
             sh """
               ./eksctl create cluster \
                 --name eks-${params.cluster} \
@@ -65,9 +71,16 @@ pipeline {
                 --node-type ${params.instance_type} \
                 --with-oidc \
                 --ssh-access \
+                ${ca_args} \
                 --ssh-public-key ${params.key_pair} \
                 --managed
             """
+
+            if (params.cloudwatch == true) {
+              sh """
+                eksctl utils update-cluster-logging --enable-types all --approve --cluster eks-${params.cluster}
+              """
+            }
           }
         }
       }
