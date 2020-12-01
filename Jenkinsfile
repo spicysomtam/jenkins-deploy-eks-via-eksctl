@@ -2,7 +2,7 @@ pipeline {
 
    parameters {
     choice(name: 'action', choices: 'create\ndestroy', description: 'Create/update or destroy the eks cluster.')
-    string(name: 'cluster', defaultValue : 'demo', description: "EKS cluster name;eg demo creates cluster named eks-demo.")
+    string(name: 'cluster', defaultValue : 'demo', description: "EKS cluster name.")
     choice(name: 'k8s_version', choices: '1.17\n1.18\n1.16\n1.15', description: 'K8s version to install.')
     string(name: 'instance_type', defaultValue : 'm5.large', description: "k8s worker node instance type.")
     string(name: 'num_workers', defaultValue : '3', description: "k8s number of worker instances.")
@@ -29,7 +29,7 @@ pipeline {
     stage('Setup') {
       steps {
         script {
-          currentBuild.displayName = "#" + env.BUILD_NUMBER + " " + params.action + " eks-" + params.cluster
+          currentBuild.displayName = "#" + env.BUILD_NUMBER + " " + params.action + " " + params.cluster
 
           println "Getting the kubectl and eksctl binaries..."
           sh """
@@ -48,7 +48,7 @@ pipeline {
       }
       steps {
         script {
-          input "Create EKS cluster eks-${params.cluster} in aws?" 
+          input "Create EKS cluster ${params.cluster} in aws?" 
 
           withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', 
           credentialsId: params.credential, 
@@ -63,10 +63,10 @@ pipeline {
 
             sh """
               ./eksctl create cluster \
-                --name eks-${params.cluster} \
+                --name ${params.cluster} \
                 --version ${params.k8s_version} \
                 --region  ${params.region} \
-                --nodegroup-name eks-${params.cluster}-0 \
+                --nodegroup-name ${params.cluster}-0 \
                 --nodes ${params.num_workers} \
                 --nodes-min ${params.num_workers} \
                 --nodes-max ${params.max_workers} \
@@ -81,7 +81,7 @@ pipeline {
             // Oddly there isn't a eksctl arg to enable cw logs, although it can be passed as config.
             if (params.cloudwatch == true) {
               sh """
-                ./eksctl utils update-cluster-logging --enable-types all --approve --cluster eks-${params.cluster}
+                ./eksctl utils update-cluster-logging --enable-types all --approve --cluster ${params.cluster}
               """
             }
           }
@@ -101,7 +101,7 @@ pipeline {
           secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
             
             sh """
-              aws eks update-kubeconfig --name eks-${params.cluster} --region ${params.region}
+              aws eks update-kubeconfig --name ${params.cluster} --region ${params.region}
             """
 
             // The recently introduced CW Metrics and Container Insights setup
@@ -114,14 +114,14 @@ pipeline {
 
               sh """
                 curl --silent https://raw.githubusercontent.com/aws-samples/amazon-cloudwatch-container-insights/latest/k8s-deployment-manifest-templates/deployment-mode/daemonset/container-insights-monitoring/quickstart/cwagent-fluentd-quickstart.yaml | \\
-                  sed "s/{{cluster_name}}/eks-${params.cluster}/;s/{{region_name}}/${params.region}/" | \\
+                  sed "s/{{cluster_name}}/${params.cluster}/;s/{{region_name}}/${params.region}/" | \\
                   ./kubectl apply -f -
               """
 
               // All this complexity to get the EC2 instance role and then attach the policy for CW Metrics
               roleArn = sh(returnStdout: true, 
                 script: """
-                aws eks describe-nodegroup --nodegroup-name eks-${params.cluster}-0 --cluster-name eks-${params.cluster} --query nodegroup.nodeRole --output text
+                aws eks describe-nodegroup --nodegroup-name ${params.cluster}-0 --cluster-name ${params.cluster} --query nodegroup.nodeRole --output text
                 """).trim()
 
               role = roleArn.split('/')[1]
@@ -164,7 +164,7 @@ pipeline {
                 ./kubectl -n kube-system annotate deployment.apps/cluster-autoscaler cluster-autoscaler.kubernetes.io/safe-to-evict="false"
                 ./kubectl -n kube-system get deployment.apps/cluster-autoscaler -o json | \\
                   jq | \\
-                  sed 's/<YOUR CLUSTER NAME>/eks-${params.cluster}/g' | \\
+                  sed 's/<YOUR CLUSTER NAME>/${params.cluster}/g' | \\
                   jq '.spec.template.spec.containers[0].command += ["--balance-similar-node-groups","--skip-nodes-with-system-pods=false"]' | \\
                   ./kubectl apply -f -
                 ./kubectl -n kube-system set image deployment.apps/cluster-autoscaler cluster-autoscaler=${gregion}.gcr.io/k8s-artifacts-prod/autoscaling/cluster-autoscaler:v${params.k8s_version}.${tag}
@@ -203,7 +203,7 @@ pipeline {
       }
       steps {
         script {
-          input "Destroy EKS cluster eks-${params.cluster} in aws?" 
+          input "Destroy EKS cluster ${params.cluster} in aws?" 
 
           withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', 
             credentialsId: params.credential, 
@@ -215,7 +215,7 @@ pipeline {
                // We need to detach before running eksctl otherwise eksctl will fail to delete
               roleArn = sh(returnStdout: true, 
                 script: """
-                aws eks describe-nodegroup --nodegroup-name eks-${params.cluster}-0 --cluster-name eks-${params.cluster} --query nodegroup.nodeRole --output text
+                aws eks describe-nodegroup --nodegroup-name ${params.cluster}-0 --cluster-name ${params.cluster} --query nodegroup.nodeRole --output text
                 """).trim()
 
               role = roleArn.split('/')[1]
@@ -235,7 +235,7 @@ pipeline {
 
             sh """
               ./eksctl delete cluster \
-                --name eks-${params.cluster} \
+                --name ${params.cluster} \
                 --region ${params.region} \
                 --wait
             """
