@@ -222,6 +222,14 @@ pipeline {
 
               sh """
                 aws iam detach-role-policy --role-name ${role} --policy-arn arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy || true
+
+                [ -d kubernetes-ingress ] && rm -rf kubernetes-ingress
+                git clone https://github.com/nginxinc/kubernetes-ingress.git
+
+                # Need to clean this up otherwise the vpc can't be deleted
+                ./kubectl delete -f kubernetes-ingress/deployments/service/loadbalancer-aws-elb.yaml || true
+                [ -d kubernetes-ingress ] && rm -rf kubernetes-ingress
+                sleep 20
               """
             }
 
