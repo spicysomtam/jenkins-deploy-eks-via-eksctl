@@ -220,7 +220,7 @@ pipeline {
               role = roleArn.split('/')[1]
 
               sh """
-                aws iam detach-role-policy --role-name ${role} --policy-arn arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+                aws iam detach-role-policy --role-name ${role} --policy-arn arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy || true
               """
             }
 
