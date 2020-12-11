@@ -108,7 +108,7 @@ pipeline {
 
             // If admin_users specified
             if (params.admin_users != '') {
-              sh "./generate-aws-auth-admins.sh ${params.admin_users} | ./kubeconfig apply -f -"
+              sh "./generate-aws-auth-admins.sh ${params.admin_users} | ./kubectl apply -f -"
             }
 
             // The recently introduced CW Metrics and Container Insights setup
