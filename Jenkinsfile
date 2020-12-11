@@ -9,7 +9,8 @@ pipeline {
     string(name: 'max_workers', defaultValue : '10', description: "k8s maximum number of worker instances that can be scaled.")
     string(name: 'admin_users', defaultValue : '', description: "Comma delimited list of IAM users to add to the aws-auth config map.")
     string(name: 'credential', defaultValue : 'jenkins', description: "Jenkins credential that provides the AWS access key and secret.")
-    booleanParam(name: 'cloudwatch', defaultValue : true, description: "Setup Cloudwatch logging, metrics and Container Insights?")
+    booleanParam(name: 'cw_logs', defaultValue : true, description: "Setup Cloudwatch logging?")
+    booleanParam(name: 'cw_metrics', defaultValue : false, description: "Setup Cloudwatch metrics and Container Insights?")
     booleanParam(name: 'nginx_ingress', defaultValue : true, description: "Setup nginx ingress and load balancer?")
     booleanParam(name: 'ca', defaultValue : false, description: "Setup k8s Cluster Autoscaler?")
     booleanParam(name: 'cert_manager', defaultValue : false, description: "Setup cert-manager for certificate handling?")
@@ -81,7 +82,8 @@ pipeline {
             """
 
             // Oddly there isn't a eksctl arg to enable cw logs, although it can be passed as config.
-            if (params.cloudwatch == true) {
+            if (params.cw_logs == true) {
+              echo "Setting up Cloudwatch logs."
               sh """
                 ./eksctl utils update-cluster-logging --enable-types all --approve --cluster ${params.cluster}
               """
@@ -117,8 +119,8 @@ pipeline {
             // https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Container-Insights-setup-EKS-quickstart.html
             // eksctl does not support CW metrics currently, so we need to tweak the EC2 instance role to allow it to work.
             // See this for the issue: https://github.com/weaveworks/eksctl/issues/811#issuecomment-731266712
-            if (params.cloudwatch == true) {
-              echo "Setting up Cloudwatch logs, metrics and Container Insights."
+            if (params.cw_metrics == true) {
+              echo "Setting up Cloudwatch metrics and Container Insights."
 
               sh """
                 curl --silent https://raw.githubusercontent.com/aws-samples/amazon-cloudwatch-container-insights/latest/k8s-deployment-manifest-templates/deployment-mode/daemonset/container-insights-monitoring/quickstart/cwagent-fluentd-quickstart.yaml | \\
@@ -229,29 +231,26 @@ pipeline {
             credentialsId: params.credential, 
             accessKeyVariable: 'AWS_ACCESS_KEY_ID',  
             secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
+            // All this complexity to get the EC2 instance role and then dettach the policy for CW Metrics
+            // We need to detach before running eksctl otherwise eksctl will fail to delete
+            roleArn = sh(returnStdout: true, 
+              script: """
+              aws eks describe-nodegroup --nodegroup-name ${params.cluster}-0 --cluster-name ${params.cluster} --query nodegroup.nodeRole --output text
+              """).trim()
 
-            if (params.cloudwatch == true) {
-               // All this complexity to get the EC2 instance role and then dettach the policy for CW Metrics
-               // We need to detach before running eksctl otherwise eksctl will fail to delete
-              roleArn = sh(returnStdout: true, 
-                script: """
-                aws eks describe-nodegroup --nodegroup-name ${params.cluster}-0 --cluster-name ${params.cluster} --query nodegroup.nodeRole --output text
-                """).trim()
+            role = roleArn.split('/')[1]
 
-              role = roleArn.split('/')[1]
+            sh """
+              aws iam detach-role-policy --role-name ${role} --policy-arn arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy || true
 
-              sh """
-                aws iam detach-role-policy --role-name ${role} --policy-arn arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy || true
+              [ -d kubernetes-ingress ] && rm -rf kubernetes-ingress
+              git clone https://github.com/nginxinc/kubernetes-ingress.git
 
-                [ -d kubernetes-ingress ] && rm -rf kubernetes-ingress
-                git clone https://github.com/nginxinc/kubernetes-ingress.git
-
-                # Need to clean this up otherwise the vpc can't be deleted
-                ./kubectl delete -f kubernetes-ingress/deployments/service/loadbalancer-aws-elb.yaml || true
-                [ -d kubernetes-ingress ] && rm -rf kubernetes-ingress
-                sleep 20
-              """
-            }
+              # Need to clean this up otherwise the vpc can't be deleted
+              ./kubectl delete -f kubernetes-ingress/deployments/service/loadbalancer-aws-elb.yaml || true
+              [ -d kubernetes-ingress ] && rm -rf kubernetes-ingress
+              sleep 20
+            """
 
             sh """
               ./eksctl delete cluster \
