@@ -74,7 +74,9 @@ Note that while v1.18 is available for eks, v1.17 is still the default, probably
 
 ## Automatic setting up of CloudWatch logging, metrics and Container Insights
 
-EKS allows all k8s logging to be sent to CloudWatch logs, which is really useful for investigating issues. In addition, CloudWatch metrics are also gathered from EKS clusters, and these are fed into the recently released Container Insights, which allows you to see graphs on performance, etc. These are not setup automatically in EKS and thus I added this as an option, with the default being enabled (why would you not want this?).
+EKS allows all k8s logging to be sent to CloudWatch logs, which is really useful for investigating issues. I have added an option for this.
+
+In addition, CloudWatch metrics are also gathered from EKS clusters, and these are fed into the recently released Container Insights, which allows you to see graphs on performance, etc. These are not setup automatically in EKS and thus I added this as an option, with the default being disabled. The reason its disabled is because costs can mount on the metrics, while the logging costs are reasonable. Thus you might enable metrics on prod clusters but turn them off on dev clusters.
 
 ## Automatic setup on nginx ingress and a load balancer
 
