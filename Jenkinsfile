@@ -108,6 +108,7 @@ pipeline {
 
             // If admin_users specified
             if (params.admin_users != '') {
+              echo "Adding admin_users to configmap aws-auth."
               sh "./generate-aws-auth-admins.sh ${params.admin_users} | ./kubectl apply -f -"
             }
 
