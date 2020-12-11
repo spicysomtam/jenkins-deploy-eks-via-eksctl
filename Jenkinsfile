@@ -266,10 +266,9 @@ pipeline {
 
   }
 
-  post {
-    always{
-      echo "Post always"
+  //post {
+  //  always{
       //deleteDir()
-    }
-  }
+  //  }
+  //}
 }
