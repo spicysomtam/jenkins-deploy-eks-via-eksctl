@@ -27,6 +27,11 @@ pipeline {
 
   agent { label 'master' }
 
+  environment {
+    // Set path to workspace bin dir
+    PATH = "${env.WORKSPACE}/bin:${env.PATH}"
+  }
+
   stages {
 
     stage('Setup') {
@@ -36,10 +41,13 @@ pipeline {
 
           println "Getting the kubectl and eksctl binaries..."
           sh """
+            mkdir bin
+            ( cd bin
             curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_\$(uname -s)_amd64.tar.gz" | tar xzf -
             curl --silent -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.21.2/2021-07-05/bin/linux/amd64/kubectl
             chmod u+x ./eksctl ./kubectl
-            ls -l ./eksctl ./kubectl
+            pwd
+            ls -l eksctl kubectl )
           """
         }
       }
@@ -65,7 +73,7 @@ pipeline {
             }
 
             sh """
-              ./eksctl create cluster \
+              eksctl create cluster \
                 --name ${params.cluster} \
                 --version ${params.k8s_version} \
                 --region  ${params.region} \
@@ -85,7 +93,7 @@ pipeline {
             if (params.cw_logs == true) {
               echo "Setting up Cloudwatch logs."
               sh """
-                ./eksctl utils update-cluster-logging --enable-types all --approve --cluster ${params.cluster}
+                eksctl utils update-cluster-logging --enable-types all --approve --cluster ${params.cluster}
               """
             }
           }
@@ -111,7 +119,7 @@ pipeline {
             // If admin_users specified
             if (params.admin_users != '') {
               echo "Adding admin_users to configmap aws-auth."
-              sh "./generate-aws-auth-admins.sh ${params.admin_users} | ./kubectl apply -f -"
+              sh "./generate-aws-auth-admins.sh ${params.admin_users} | kubectl apply -f -"
             }
 
             // The recently introduced CW Metrics and Container Insights setup
@@ -125,7 +133,7 @@ pipeline {
               sh """
                 curl --silent https://raw.githubusercontent.com/aws-samples/amazon-cloudwatch-container-insights/latest/k8s-deployment-manifest-templates/deployment-mode/daemonset/container-insights-monitoring/quickstart/cwagent-fluentd-quickstart.yaml | \\
                   sed "s/{{cluster_name}}/${params.cluster}/;s/{{region_name}}/${params.region}/" | \\
-                  ./kubectl apply -f -
+                  kubectl apply -f -
               """
 
               // All this complexity to get the EC2 instance role and then attach the policy for CW Metrics
@@ -156,28 +164,28 @@ pipeline {
               switch (params.k8s_version) {
                 case '1.18':
                   tag='3'
-                	break;
+                    break;
                 case '1.17':
                   tag='4'
-                	break;
+                    break;
                 case '1.16':
                   tag='7'
-              	  break;
+                    break;
                 case '1.15':
                   tag='7'
-              	  break;
+                    break;
               }
 
               // Setup documented here: https://docs.aws.amazon.com/eks/latest/userguide/cluster-autoscaler.html
               sh """
-                ./kubectl apply -f https://raw.githubusercontent.com/kubernetes/autoscaler/master/cluster-autoscaler/cloudprovider/aws/examples/cluster-autoscaler-autodiscover.yaml
-                ./kubectl -n kube-system annotate deployment.apps/cluster-autoscaler cluster-autoscaler.kubernetes.io/safe-to-evict="false"
-                ./kubectl -n kube-system get deployment.apps/cluster-autoscaler -o json | \\
+                kubectl apply -f https://raw.githubusercontent.com/kubernetes/autoscaler/master/cluster-autoscaler/cloudprovider/aws/examples/cluster-autoscaler-autodiscover.yaml
+                kubectl -n kube-system annotate deployment.apps/cluster-autoscaler cluster-autoscaler.kubernetes.io/safe-to-evict="false"
+                kubectl -n kube-system get deployment.apps/cluster-autoscaler -o json | \\
                   jq | \\
                   sed 's/<YOUR CLUSTER NAME>/${params.cluster}/g' | \\
                   jq '.spec.template.spec.containers[0].command += ["--balance-similar-node-groups","--skip-nodes-with-system-pods=false"]' | \\
-                  ./kubectl apply -f -
-                ./kubectl -n kube-system set image deployment.apps/cluster-autoscaler cluster-autoscaler=${gregion}.gcr.io/k8s-artifacts-prod/autoscaling/cluster-autoscaler:v${params.k8s_version}.${tag}
+                  kubectl apply -f -
+                kubectl -n kube-system set image deployment.apps/cluster-autoscaler cluster-autoscaler=${gregion}.gcr.io/k8s-artifacts-prod/autoscaling/cluster-autoscaler:v${params.k8s_version}.${tag}
               """
             }
 
@@ -188,17 +196,17 @@ pipeline {
                 [ -d kubernetes-ingress ] && rm -rf kubernetes-ingress
                 git clone https://github.com/nginxinc/kubernetes-ingress.git
                 cd kubernetes-ingress/deployments/
-                ../../kubectl apply -f common/ns-and-sa.yaml
-                ../../kubectl apply -f common/default-server-secret.yaml
-                ../../kubectl apply -f common/nginx-config.yaml
-                ../../kubectl apply -f rbac/rbac.yaml
-                ../../kubectl apply -f deployment/nginx-ingress.yaml
+                kubectl apply -f common/ns-and-sa.yaml
+                kubectl apply -f common/default-server-secret.yaml
+                kubectl apply -f common/nginx-config.yaml
+                kubectl apply -f rbac/rbac.yaml
+                kubectl apply -f deployment/nginx-ingress.yaml
                 sleep 5
-                ../../kubectl apply -f service/loadbalancer-aws-elb.yaml
+                kubectl apply -f service/loadbalancer-aws-elb.yaml
                 cd -
                 rm -rf kubernetes-ingress
-                ./kubectl apply -f nginx-ingress-proxy.yaml
-                ./kubectl get svc --namespace=nginx-ingress
+                kubectl apply -f nginx-ingress-proxy.yaml
+                kubectl get svc --namespace=nginx-ingress
               """
             }
 
@@ -207,11 +215,11 @@ pipeline {
               sh """
                 helm repo add jetstack https://charts.jetstack.io || true
                 helm repo update
-                ./kubectl create ns cert-manager
+                kubectl create ns cert-manager
                 helm install cert-manager jetstack/cert-manager --namespace cert-manager --version v1.1.0 --set installCRDs=true
                 sleep 30 # allow cert-manager setup in the cluster
-                ./kubectl apply -f cluster-issuer-le-staging.yaml
-                ./kubectl apply -f cluster-issuer-le-prod.yaml
+                kubectl apply -f cluster-issuer-le-staging.yaml
+                kubectl apply -f cluster-issuer-le-prod.yaml
               """
             }
           }
@@ -247,13 +255,13 @@ pipeline {
               git clone https://github.com/nginxinc/kubernetes-ingress.git
 
               # Need to clean this up otherwise the vpc can't be deleted
-              ./kubectl delete -f kubernetes-ingress/deployments/service/loadbalancer-aws-elb.yaml || true
+              kubectl delete -f kubernetes-ingress/deployments/service/loadbalancer-aws-elb.yaml || true
               [ -d kubernetes-ingress ] && rm -rf kubernetes-ingress
               sleep 20
             """
 
             sh """
-              ./eksctl delete cluster \
+              eksctl delete cluster \
                 --name ${params.cluster} \
                 --region ${params.region} \
                 --wait
