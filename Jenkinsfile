@@ -204,25 +204,12 @@ pipeline {
             // See: https://aws.amazon.com/premiumsupport/knowledge-center/eks-access-kubernetes-services/
             if (params.nginx_ingress == true) {
               echo "Setting up nginx ingress and load balancer."
-              (major, minor) = params.k8s_version.split(/\./)
               sh """
                 [ -d kubernetes-ingress ] && rm -rf kubernetes-ingress
                 git clone https://github.com/nginxinc/kubernetes-ingress.git
-                cd kubernetes-ingress/deployments/
-                kubectl apply -f common/ns-and-sa.yaml
-                kubectl apply -f rbac/rbac.yaml
-                kubectl apply -f common/default-server-secret.yaml
-                kubectl apply -f common/nginx-config.yaml
-
-                # k8s >= 1.18 
-                [ ${major} -ge 1 -a ${minor} -ge 18 ] && {
-                  kubectl apply -f common/ingress-class.yaml
-                }
-
-                kubectl apply -f deployment/nginx-ingress.yaml
-                sleep 5
-                kubectl apply -f service/loadbalancer-aws-elb.yaml
-                cd -
+                (cd kubernetes-ingress/deployments/helm-chart
+                git checkout v1.12.0
+                helm install nginx-ingress . --namespace nginx-ingress --create-namespace)
                 rm -rf kubernetes-ingress
                 kubectl apply -f nginx-ingress-proxy.yaml
                 kubectl get svc --namespace=nginx-ingress
@@ -234,8 +221,7 @@ pipeline {
               sh """
                 helm repo add jetstack https://charts.jetstack.io || true
                 helm repo update
-                kubectl create ns cert-manager
-                helm install cert-manager jetstack/cert-manager --namespace cert-manager --version v1.1.0 --set installCRDs=true
+                helm install cert-manager jetstack/cert-manager --namespace cert-manager --version v1.1.0 --set installCRDs=true --create-namespace
                 sleep 30 # allow cert-manager setup in the cluster
                 kubectl apply -f cluster-issuer-le-staging.yaml
                 kubectl apply -f cluster-issuer-le-prod.yaml
