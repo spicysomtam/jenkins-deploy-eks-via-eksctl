@@ -222,7 +222,7 @@ pipeline {
               sh """
                 helm repo add jetstack https://charts.jetstack.io || true
                 helm repo update
-                helm install cert-manager jetstack/cert-manager --namespace cert-manager --version v1.1.0 --set installCRDs=true --create-namespace
+                helm install cert-manager jetstack/cert-manager --namespace cert-manager --version v1.5.3 --set installCRDs=true --create-namespace
                 sleep 30 # allow cert-manager setup in the cluster
                 kubectl apply -f cluster-issuer-le-staging.yaml
                 kubectl apply -f cluster-issuer-le-prod.yaml
