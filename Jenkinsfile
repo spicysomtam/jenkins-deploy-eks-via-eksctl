@@ -4,7 +4,7 @@ pipeline {
     choice(name: 'action', choices: 'create\ndestroy', description: 'Create/update or destroy the eks cluster.')
     string(name: 'cluster', defaultValue : 'demo', description: "EKS cluster name.")
     choice(name: 'k8s_version', choices: '1.21\n1.20\n1.19\n1.18\n1.17\n1.16', description: 'K8s version to install.')
-    string(name: 'instance_type', defaultValue : 'm5.large', description: "k8s worker node instance type.")
+    string(name: 'instance_type', defaultValue : 'm6i.large', description: "k8s worker node instance type.")
     string(name: 'num_workers', defaultValue : '3', description: "k8s number of worker instances.")
     string(name: 'max_workers', defaultValue : '10', description: "k8s maximum number of worker instances that can be scaled.")
     string(name: 'admin_users', defaultValue : '', description: "Comma delimited list of IAM users to add to the aws-auth config map.")
@@ -15,7 +15,7 @@ pipeline {
     booleanParam(name: 'ca', defaultValue : false, description: "Setup k8s Cluster Autoscaler?")
     booleanParam(name: 'cert_manager', defaultValue : false, description: "Setup cert-manager for certificate handling?")
     string(name: 'region', defaultValue : 'eu-west-1', description: "AWS region.")
-    string(name: 'key_pair', defaultValue : 'spicysomtam-aws4', description: "EC2 instance ssh keypair.")
+    string(name: 'key_pair', defaultValue : 'spicysomtam-aws7', description: "EC2 instance ssh keypair.")
   }
 
   options {
