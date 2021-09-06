@@ -1,4 +1,4 @@
-// Unfortunatly eks is fiddly and messy. Consider gcp gke if you want easy to deply k8s clusters!
+// Unfortunatly eks is fiddly and messy. Consider gcp gke if you want easy to deply k8s clusters with greater performance!
 
 pipeline {
 
@@ -203,14 +203,21 @@ pipeline {
             // See: https://aws.amazon.com/premiumsupport/knowledge-center/eks-access-kubernetes-services/
             if (params.nginx_ingress == true) {
               echo "Setting up nginx ingress and load balancer."
+              k_ver = params.k8s_version.split(/\./)
               sh """
                 [ -d kubernetes-ingress ] && rm -rf kubernetes-ingress
                 git clone https://github.com/nginxinc/kubernetes-ingress.git
                 cd kubernetes-ingress/deployments/
                 kubectl apply -f common/ns-and-sa.yaml
+                kubectl apply -f rbac/rbac.yaml
                 kubectl apply -f common/default-server-secret.yaml
                 kubectl apply -f common/nginx-config.yaml
-                kubectl apply -f rbac/rbac.yaml
+
+                # k8s >= 1.18 
+                [ ${kver[0]} -ge 1 -a ${kver[1]} -ge 18 ] && {
+                  kubectl apply -f common/ingress-class.yaml
+                }
+
                 kubectl apply -f deployment/nginx-ingress.yaml
                 sleep 5
                 kubectl apply -f service/loadbalancer-aws-elb.yaml
