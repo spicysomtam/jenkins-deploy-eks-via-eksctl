@@ -202,6 +202,7 @@ pipeline {
             }
 
             // See: https://aws.amazon.com/premiumsupport/knowledge-center/eks-access-kubernetes-services/
+            // Also https://docs.nginx.com/nginx-ingress-controller/installation/installation-with-helm/
             if (params.nginx_ingress == true) {
               echo "Setting up nginx ingress and load balancer."
               sh """
