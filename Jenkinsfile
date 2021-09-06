@@ -54,10 +54,6 @@ pipeline {
             rm -rf linux-amd64
             chmod u+x eksctl kubectl helm
             ls -l eksctl kubectl helm )
-            [ ${major} -ge 1 -a ${minor} -ge 18 ] && {
-              echo "k8s >= 1.18"
-            }
-
           """
         }
       }
