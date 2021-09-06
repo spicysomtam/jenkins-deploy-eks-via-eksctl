@@ -42,6 +42,7 @@ pipeline {
           currentBuild.displayName = "#" + env.BUILD_NUMBER + " " + params.action + " " + params.cluster
 
           println "Getting the kubectl, eksctl and helm binaries..."
+          (major, minor) = params.k8s_version.split(/\./)
           sh """
             mkdir bin
             ( cd bin
@@ -53,6 +54,10 @@ pipeline {
             rm -rf linux-amd64
             chmod u+x eksctl kubectl helm
             ls -l eksctl kubectl helm )
+            [ ${major} -ge 1 -a ${minor} -ge 18 ] && {
+              echo "k8s >= 1.18"
+            }
+
           """
         }
       }
@@ -203,7 +208,7 @@ pipeline {
             // See: https://aws.amazon.com/premiumsupport/knowledge-center/eks-access-kubernetes-services/
             if (params.nginx_ingress == true) {
               echo "Setting up nginx ingress and load balancer."
-              k_ver = params.k8s_version.split(/\./)
+              (major, minor) = params.k8s_version.split(/\./)
               sh """
                 [ -d kubernetes-ingress ] && rm -rf kubernetes-ingress
                 git clone https://github.com/nginxinc/kubernetes-ingress.git
@@ -214,7 +219,7 @@ pipeline {
                 kubectl apply -f common/nginx-config.yaml
 
                 # k8s >= 1.18 
-                [ ${kver[0]} -ge 1 -a ${kver[1]} -ge 18 ] && {
+                [ ${major} -ge 1 -a ${minor} -ge 18 ] && {
                   kubectl apply -f common/ingress-class.yaml
                 }
 
