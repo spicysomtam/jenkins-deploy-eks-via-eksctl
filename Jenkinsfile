@@ -1,3 +1,5 @@
+// Unfortunatly eks is fiddly and messy. Consider gcp gke if you want easy to deply k8s clusters!
+
 pipeline {
 
    parameters {
@@ -162,6 +164,15 @@ pipeline {
               // CA image tag, which is k8s major version plus CA minor version.
               // See for latest versions: https://github.com/kubernetes/autoscaler/releases
               switch (params.k8s_version) {
+                case '1.21':
+                  tag='0'
+                    break;
+                case '1.20':
+                  tag='0'
+                    break;
+                case '1.19':
+                  tag='1'
+                    break;
                 case '1.18':
                   tag='3'
                     break;
@@ -169,9 +180,6 @@ pipeline {
                   tag='4'
                     break;
                 case '1.16':
-                  tag='7'
-                    break;
-                case '1.15':
                   tag='7'
                     break;
               }
