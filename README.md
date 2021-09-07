@@ -117,6 +117,10 @@ Note that you should also consider the Horizontal Pod Autoscaler, which will sca
 
 ### Testing the Cluster Autoscaler
 
+For a complete test we need to test that nodes are scaled up and then down.
+
+#### Scale up
+
 The easiest way to do this is deploy a cluster with a limited number of worker nodes, and then overload them with pods. A simple way to do this is deploy a helm3 chart, and then scale up the number of replicas (pods). 
 
 I found that based on a `m5.large` instance type, using a `nginx` deployment, I could deploy approx 30 pods per worker (pods per node). Lets run through this:
@@ -128,22 +132,24 @@ ip-10-0-1-74.eu-west-1.compute.internal   Ready      <none>   46m   v1.17.11-eks
 
 $ kubectl -n kube-system logs -f deployment.apps/cluster-autoscaler # we can check ca logging
 $ cd /tmp
-$ helm create foobah # This creates a local chart based on nginx
-$ helm upgrade fb0 foobah/ --set replicaCount=30 # 1 node overloaded
-$ helm upgrade fb0 foobah/ --set replicaCount=60 # 2 nodes overloaded
-$ kubeclt get pos -A # Do we have any pending pods?
+$ helm create nginx # This creates a local chart based on nginx
+$ helm upgrade ng0 nginx/ --set replicaCount=30 # 1 node overloaded
+$ helm upgrade ng0 nginx/ --set replicaCount=60 # 2 nodes overloaded
+$ kubeclt get po # Do we have any pending pods?
 $ kubectl get nodes # See if we are scaling up; could check the AWS EC2 Console?
 ```
 
 You should see nodes being added as pods are in pending state. In AWS it can take a couple of minutes to deploy another node. I would increase the number of pods such that you force the addition of 2 nodes.
 
+#### Scale down
+
 We can also check the scale down:
-* Reduce the number of pods to say 10.
+* Reduce the number of pods to 10.
 * Wait 10 mins; the ca should start terminating nodes via the auto scaling group.
 * If there are pods on nodes that are terminated, kubernetes we kill and restart these on active nodes.
 * Needless to say your application should be able to safely restart pods without any side effects!
 
-### Working round the delay in spinning up another worker
+#### Working round the delay in spinning up another worker
 
 You might ask how can be get round the delay in scaling up another worker? Pods have a priority. You could create a deployment with pods of a lower priority than your default (0); lets call these placeholder pods. Then k8s will kill these placeholder pods and replace them with your regular pods when needed. So you could autoprovision a single node full of these placeholder pods. Your placeholder pods will then become pending after being killed and CA will then spin up another worker for them; since these placeholder pods arn't doing anything useful we don't mind the delay. This is just an idea; I probably need to google a solution where this has been implemented, and provide a link to it (I am sure someone has written something for this).
 
