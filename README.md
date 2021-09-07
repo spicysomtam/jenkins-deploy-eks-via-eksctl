@@ -31,6 +31,7 @@ So the pods per node for EKS is limited by the Container Network Interface (CNI)
 I also observe the pod startup and creation is much faster on k3s and gke than eks, and might attribute that to the CNI allocation of the IP for the pod. The cluster creation is also much quicker with google cloud platform and my terraform k3s deploy.
 
 Of all the cloud native kubernetes services, IMHO GCP is the best; not only are the clusters fast to deploy, many things such as ingress have been made easy to setup, and there are lots of guides for doing common tasks within the gcp console. It feels slick and polished. Google Cloud also has a command line tool and api interface.
+
 ## Accessing the cluster
 
 Ensure your awscli is up to date as the newer way to access the cluster is via the `aws` cli rather than the `aws-iam-authenticator`, which you used to need to download and install in your path somewhere. 
@@ -118,7 +119,7 @@ Note that you should also consider the Horizontal Pod Autoscaler, which will sca
 
 The easiest way to do this is deploy a cluster with a limited number of worker nodes, and then overload them with pods. A simple way to do this is deploy a helm3 chart, and then scale up the number of replicas (pods). 
 
-I found that based on a `m5.large` instance type, using a `nginx` deployment, I could deploy approx 30 pods per worker. Lets run through this:
+I found that based on a `m5.large` instance type, using a `nginx` deployment, I could deploy approx 30 pods per worker (pods per node). Lets run through this:
 
 ```
 $ kubectl get nodes # We only have one node as I deliberatly set the cluster up like this
@@ -126,12 +127,21 @@ NAME                                      STATUS     ROLES    AGE   VERSION
 ip-10-0-1-74.eu-west-1.compute.internal   Ready      <none>   46m   v1.17.11-eks-cfdc40
 
 $ kubectl -n kube-system logs -f deployment.apps/cluster-autoscaler # we can check ca logging
+$ cd /tmp
 $ helm create foobah # This creates a local chart based on nginx
-$ helm upgrade --install fb0 foobah/ --set replicaCount=30 # 1 node overloaded
-$ helm upgrade --install fb0 foobah/ --set replicaCount=60 # 2 nodes overloaded
+$ helm upgrade fb0 foobah/ --set replicaCount=30 # 1 node overloaded
+$ helm upgrade fb0 foobah/ --set replicaCount=60 # 2 nodes overloaded
 $ kubeclt get pos -A # Do we have any pending pods?
-$ kubectl get nodes # See if we are sclaing up; could check the AWS EC2 Console?
+$ kubectl get nodes # See if we are scaling up; could check the AWS EC2 Console?
 ```
+
+You should see nodes being added as pods are in pending state. In AWS it can take a couple of minutes to deploy another node. I would increase the number of pods such that you force the addition of 2 nodes.
+
+We can also check the scale down:
+* Reduce the number of pods to say 10.
+* Wait 10 mins; the ca should start terminating nodes via the auto scaling group.
+* If there are pods on nodes that are terminated, kubernetes we kill and restart these on active nodes.
+* Needless to say your application should be able to safely restart pods without any side effects!
 
 ### Working round the delay in spinning up another worker
 

@@ -189,6 +189,8 @@ pipeline {
               }
 
               // Setup documented here: https://docs.aws.amazon.com/eks/latest/userguide/cluster-autoscaler.html
+              // Note the eksctl arg --asg-access sets up an inline policy for the node group with the required ASG permissions as per docs above (the docs are out of date).
+              // Tested ca 2021/k8s 1.21.
               sh """
                 kubectl apply -f https://raw.githubusercontent.com/kubernetes/autoscaler/master/cluster-autoscaler/cloudprovider/aws/examples/cluster-autoscaler-autodiscover.yaml
                 kubectl -n kube-system annotate deployment.apps/cluster-autoscaler cluster-autoscaler.kubernetes.io/safe-to-evict="false"
@@ -203,6 +205,7 @@ pipeline {
 
             // See: https://aws.amazon.com/premiumsupport/knowledge-center/eks-access-kubernetes-services/
             // Also https://docs.nginx.com/nginx-ingress-controller/installation/installation-with-helm/
+            // Switched to helm install 2021 to simplify install across different k8s versions.
             if (params.nginx_ingress == true) {
               echo "Setting up nginx ingress and load balancer."
               sh """
@@ -217,6 +220,7 @@ pipeline {
               """
             }
 
+            // Updated cert-manager version installed 2021
             if (params.cert_manager == true) {
               echo "Setting up cert-manager."
               sh """
