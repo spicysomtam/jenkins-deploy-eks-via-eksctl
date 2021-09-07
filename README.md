@@ -65,7 +65,7 @@ You can create multiple eks clusters/stacks by simply specifying a different clu
 
 If a `create` goes wrong, simply re-run it for the same cluster name, but choose `destroy`, which will clean it down. Conversly you do the `destroy` when you want to tear down the stack.
 
-![Screenshot of the parameters](jenkins.png).
+![Screenshot of the parameters](Jenkins.png).
 
 ## Kubernetes version can be specified
 
