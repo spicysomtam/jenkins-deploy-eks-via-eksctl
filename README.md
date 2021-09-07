@@ -77,15 +77,17 @@ EKS allows all k8s logging to be sent to CloudWatch logs, which is really useful
 
 In addition, CloudWatch metrics are also gathered from EKS clusters, and these are fed into the recently released Container Insights, which allows you to see graphs on performance, etc. These are not setup automatically in EKS and thus I added this as an option, with the default being disabled. The reason its disabled is because costs can mount on the metrics, while the logging costs are reasonable. Thus you might enable metrics on prod clusters but turn them off on dev clusters.
 
-Note that Container Insights can become expensive to operate; consider installing metrics-server and then some form of scaper and presenter (Prometheus, Kibana, Kens, etc).
+Note that Container Insights can become expensive to operate; consider installing metrics-server and then some form of scaper and presenter (Prometheus, Kibana, Lens, etc).
 
-## Automatic setup on nginx ingress and a load balancer
+## Automatic setup of an ingress controller and a load balancer
 
-The idea here is to set nginx ingress and then just use a single Layer4/TCP style load balancer for all inbound traffic. This is in preference to creating a load balancer for each service, which may create multiple load balancers and incurr additional cost and complexity  for the cluster. 
+The idea here is to set an ingress controller and then just use a single Layer4/TCP style load balancer for all inbound traffic. This is in preference to creating a load balancer for each service, which will create multiple load balancers, incurr additional cost and complexity, and is not necessary! 
 
 In essence you create a DNS cname record for each service, which points to the load balancer. On ingress the nginx ingress determines the DNS name requested and then directs traffic to the correct service. You can Google nginx ingress to discover more about it. Note this setup also supports TLS HTTPS ingress (see TLS in kubernetes documentation on ingress controllers).
 
-This is set by default, otherwise the EKS cluster has no ingress (just a load balancer for the k8s API). Its a good default if you are not sure what you want and anyway nginx ingress is the way to go with current k8s .
+There are multiple ingress controllers available. Most people use the free open source `kubernetes/ingress-nginx`, while there is confusing another free nginx ingress from Nginx Inc called `nginxinc/kubernetes-ingress`; I used the latter as it has an official AWS Solution documented [here](https://aws.amazon.com/premiumsupport/knowledge-center/eks-access-kubernetes-services/), which has a deployment specifically for AWS. I have simplified the install using the official Helm chart.
+
+This is set by default, otherwise the EKS cluster has no ingress (just a load balancer for the k8s API). Its a good default if you are not sure what you want and anyway either of the nginx ingress's is the way to go with modern k8s .
 
 ## cert-manager install
 
