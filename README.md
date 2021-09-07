@@ -69,15 +69,15 @@ If a `create` goes wrong, simply re-run it for the same cluster name, but choose
 
 ## Kubernetes version can be specified
 
-You can choose all the versions offered in the AWS console.
-
-Note that while v1.18 is available for eks, v1.17 is still the default, probably because the k8s Cluster Autoscaler image from Google is not available yet for v1.18.
+You can choose all the versions currently offered in the AWS console.
 
 ## Automatic setting up of CloudWatch logging, metrics and Container Insights
 
 EKS allows all k8s logging to be sent to CloudWatch logs, which is really useful for investigating issues. I have added an option for this.
 
 In addition, CloudWatch metrics are also gathered from EKS clusters, and these are fed into the recently released Container Insights, which allows you to see graphs on performance, etc. These are not setup automatically in EKS and thus I added this as an option, with the default being disabled. The reason its disabled is because costs can mount on the metrics, while the logging costs are reasonable. Thus you might enable metrics on prod clusters but turn them off on dev clusters.
+
+Note that Container Insights can become expensive to operate; consider installing metrics-server and then some form of scaper and presenter (Prometheus, Kibana, Kens, etc).
 
 ## Automatic setup on nginx ingress and a load balancer
 
