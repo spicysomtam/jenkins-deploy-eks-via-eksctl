@@ -1,13 +1,16 @@
 # Introduction
 
-This is an update to my deployment [jenkins-deploy-eks-via-terraform](https://github.com/spicysomtam/jenkins-deploy-eks-via-terraform). Technology moves on, and there is now an easier way to deploy an EKS cluster using `eksctl`, which is now officially supported by AWS (docs [here](https://docs.aws.amazon.com/eks/latest/userguide/getting-started-eksctl.html)). This is now my preferred way to deploy EKS, although am still maintaining that repo, and as a result of that I have moved most of the documentation to this repo. Thus this deploy replaces the deploy via `terraform` with `eksctl`.
+This is an update to my deployment [jenkins-deploy-eks-via-terraform](https://github.com/spicysomtam/jenkins-deploy-eks-via-terraform). Technology moves on, and there is now an easier way to deploy an EKS cluster using `eksctl`, which is now officially supported by AWS (docs [here](https://docs.aws.amazon.com/eks/latest/userguide/getting-started-eksctl.html)). Both deploys have the same functionality so I have moved most of the documentation to this repo. 
 
-You should use this `eksctl` version rather than my `terraform` version as `eksctl` solves some inconsistencies and oddities in EKS which `terraform` cannot (like leaving security groups lingering in the VPC after deleting a load balancer created from a k8s service, which terraform can't deal with and then errors when deleting the VPC!). 
-
+Comparing the `terraform` and `eksctl` deploys:
+* `eksctl` uses AWS Cloudformation to deploy EKS clusters, and a single command creates the vpc, subnets, nodegroups and everything else needed. 
+* Since `eksctl` uses Coundformation stacks this might be regarded as slow and inferior to `terraform`; however Cloudformation is an official technology from AWS.
+* `terraform` is from Hashicorp and is a tool for building infrastructure for different providers like AWS, GCP, Azure, etc.
+* `eksctl` is a much simpler way to build EKS clusters than `terraform`.
+* `eksctl` deploy is much slower than `terraform`; this was not noticable on earlier versions of `eksctl` but its very apparent now. 24 mins vs 13 mins.
+* Its interesting how technologies leap frog each other; this was a reasonable way to deploy EKS but its now notibly slow.
 
 I might also add that I don't like EKS much; it has too many issues and edge cases; anyhow I digress (use k3s if you want a fast light k8s!). However I understand why someone might want an officially supported service from AWS, and over time I am sure EKS will get better as AWS develops it.
-
-The differences between `terraform` and `eksctl`? `terraform` is from Hashicorp and is a tool for building infrastructure for different providers like AWS, GCP, Azure, etc. `eksctl` uses AWS Cloudformation to deploy EKS clusters, and in a simple way creates the vpc, subnets, nodegroups and everything else needed. `eksctl` is a much simpler way to build EKS clusters via Cloudformation.
 
 There are lots of options for `eksctl`; most of this is documented at [eksctl.io](https://eksctl.io), although you might want to issue `--help` against the latest binary to see what options are available.
 
@@ -16,7 +19,7 @@ There are lots of options for `eksctl`; most of this is documented at [eksctl.io
 # EKS notes
 ## Fargate
 
-Fargate is not supported in this repo. I test Fargate and its really slow to spin up a pod (~ 60s) and its not very elegant; a Fargate worker node is deployed for each pod since Fargate uses VMs. See [this issue](https://github.com/aws/containers-roadmap/issues/649) for a discussion on EKS Fargate slowness. At the time of writing Fargate is not a realistic option (although it may get better in time). My recommendation: stick with EC2 worker nodes.
+Fargate is not supported in this repo. I test Fargate and its really slow to spin up a pod (~ 60s) and its not very elegant; a Fargate worker node is deployed for each pod since Fargate uses VMs. See [this issue](https://github.com/aws/containers-roadmap/issues/649) for a discussion on EKS Fargate slowness. At the time of writing Fargate is not a realistic option (although it may get better in time). My recommendation: stick with EC2 node groups.
 
 ## EKS has very low max pods per node
 
@@ -34,17 +37,14 @@ Of all the cloud native kubernetes services, IMHO GCP is the best; not only are 
 
 ## Accessing the cluster
 
-Ensure your awscli is up to date as the newer way to access the cluster is via the `aws` cli rather than the `aws-iam-authenticator`, which you used to need to download and install in your path somewhere. 
-
-You would use `kubectl` to access the cluster (install latest or >= v1.17 at the time of this update). 
-
-You also need a KUBECONFIG. Using the AWS credentials used by Jenkins to create the cluster (otherwise known as cluster creator access), enter the following to generate a KUBECONFIG:
-
+Ensure your aws cli is up to date as the new way to access the cluster is via the `aws` cli rather than the `aws-iam-authenticator`, which you used to need to download and install in your path somewhere. Now you can just issue the aws cli to update your kube config:
 ```
 $ aws eks update-kubeconfig --name demo --region eu-west-1
 ```
 
-Once you can access the cluster via `kubectl get all -A`, you can add access for other aws users; see official EKS docs [here](https://docs.aws.amazon.com/eks/latest/userguide/add-user-role.html). 
+You would use `kubectl` to access the cluster (install latest or >= v1.21 at the time of this update). 
+
+Once you can access the cluster via  a test command (eg `kubectl get all -A`), you can add access for other aws users; see official EKS docs [here](https://docs.aws.amazon.com/eks/latest/userguide/add-user-role.html). 
 
 ## Kubernetes api and worker nodes are on the public internet
 
@@ -104,8 +104,6 @@ See cert manager docs for full details.
 After an EKS cluster is created, only the AWS credentials that created the cluster can access it. This is problematic as you may not have the credentials Jenkins used to create the cluster.
 
 Thus you can specify a comma delimited list of IAM users who will be given full admin rights on the cluster.
-
-If no users are specified, the aws-auth config map is not updated.
 
 ## Kubernetes Cluster Autoscaler install
 

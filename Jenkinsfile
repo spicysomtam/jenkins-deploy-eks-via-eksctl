@@ -32,6 +32,8 @@ pipeline {
   environment {
     // Set path to workspace bin dir
     PATH = "${env.WORKSPACE}/bin:${env.PATH}"
+    // Workspace kube config so we don't affect other Jenkins jobs
+    KUBECONFIG = "${env.WORKSPACE}/.kube/config"
   }
 
   stages {
@@ -44,7 +46,7 @@ pipeline {
           println "Getting the kubectl, eksctl and helm binaries..."
           (major, minor) = params.k8s_version.split(/\./)
           sh """
-            mkdir bin
+            [ ! -d bin ] && mkdir bin
             ( cd bin
             curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_\$(uname -s)_amd64.tar.gz" | tar xzf -
             # 'latest' kubectl is backward compatible with older api versions
@@ -55,6 +57,8 @@ pipeline {
             chmod u+x eksctl kubectl helm
             ls -l eksctl kubectl helm )
           """
+          println "Checking jq is installed:"
+          sh "which jq"
         }
       }
     }
@@ -118,9 +122,7 @@ pipeline {
           accessKeyVariable: 'AWS_ACCESS_KEY_ID',  
           secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
             
-            sh """
-              aws eks update-kubeconfig --name ${params.cluster} --region ${params.region}
-            """
+            sh "aws eks update-kubeconfig --name ${params.cluster} --region ${params.region}"
 
             // If admin_users specified
             if (params.admin_users != '') {
@@ -135,7 +137,6 @@ pipeline {
             // See this for the issue: https://github.com/weaveworks/eksctl/issues/811#issuecomment-731266712
             if (params.cw_metrics == true) {
               echo "Setting up Cloudwatch metrics and Container Insights."
-
               sh """
                 curl --silent https://raw.githubusercontent.com/aws-samples/amazon-cloudwatch-container-insights/latest/k8s-deployment-manifest-templates/deployment-mode/daemonset/container-insights-monitoring/quickstart/cwagent-fluentd-quickstart.yaml | \\
                   sed "s/{{cluster_name}}/${params.cluster}/;s/{{region_name}}/${params.region}/" | \\
@@ -150,9 +151,7 @@ pipeline {
 
               role = roleArn.split('/')[1]
 
-              sh """
-                aws iam attach-role-policy --role-name ${role} --policy-arn arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
-              """
+              sh "aws iam attach-role-policy --role-name ${role} --policy-arn arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
             }
 
             if (params.ca == true) {
@@ -170,30 +169,31 @@ pipeline {
               switch (params.k8s_version) {
                 case '1.21':
                   tag='0'
-                    break;
+                  break;
                 case '1.20':
                   tag='0'
-                    break;
+                  break;
                 case '1.19':
                   tag='1'
-                    break;
+                  break;
                 case '1.18':
                   tag='3'
-                    break;
+                  break;
                 case '1.17':
                   tag='4'
-                    break;
+                  break;
                 case '1.16':
                   tag='7'
-                    break;
+                  break;
               }
 
               // Setup documented here: https://docs.aws.amazon.com/eks/latest/userguide/cluster-autoscaler.html
               // Note the eksctl arg --asg-access sets up an inline policy for the node group with the required ASG permissions as per docs above (the docs are out of date).
-              // Tested ca 2021/k8s 1.21.
+              // Tested ca late 2021 on k8s 1.21.
               sh """
                 kubectl apply -f https://raw.githubusercontent.com/kubernetes/autoscaler/master/cluster-autoscaler/cloudprovider/aws/examples/cluster-autoscaler-autodiscover.yaml
                 kubectl -n kube-system annotate deployment.apps/cluster-autoscaler cluster-autoscaler.kubernetes.io/safe-to-evict="false"
+                sleep 5
                 kubectl -n kube-system get deployment.apps/cluster-autoscaler -o json | \\
                   jq | \\
                   sed 's/<YOUR CLUSTER NAME>/${params.cluster}/g' | \\
@@ -205,22 +205,19 @@ pipeline {
 
             // See: https://aws.amazon.com/premiumsupport/knowledge-center/eks-access-kubernetes-services/
             // Also https://docs.nginx.com/nginx-ingress-controller/installation/installation-with-helm/
-            // Switched to helm install 2021 to simplify install across different k8s versions.
+            // Switched to helm install late 2021 to simplify install across different k8s versions.
             if (params.nginx_ingress == true) {
               echo "Setting up nginx ingress and load balancer."
               sh """
-                [ -d kubernetes-ingress ] && rm -rf kubernetes-ingress
-                git clone https://github.com/nginxinc/kubernetes-ingress.git
-                (cd kubernetes-ingress/deployments/helm-chart
-                git checkout v1.12.0
-                helm install nginx-ingress . --namespace nginx-ingress --create-namespace)
-                rm -rf kubernetes-ingress
+                helm repo add nginx-stable https://helm.nginx.com/stable
+                helm repo update
+                helm install nginx-ingress nginx-stable/nginx-ingress --namespace nginx-ingress --create-namespace
                 kubectl apply -f nginx-ingress-proxy.yaml
                 kubectl get svc --namespace=nginx-ingress
               """
             }
 
-            // Updated cert-manager version installed 2021
+            // Updated cert-manager version installed late 2021
             if (params.cert_manager == true) {
               echo "Setting up cert-manager."
               sh """
@@ -253,24 +250,26 @@ pipeline {
             // We need to detach before running eksctl otherwise eksctl will fail to delete
             roleArn = sh(returnStdout: true, 
               script: """
-              aws eks describe-nodegroup --nodegroup-name ${params.cluster}-0 --cluster-name ${params.cluster} --query nodegroup.nodeRole --output text
+                aws eks describe-nodegroup \
+                  --nodegroup-name ${params.cluster}-0 \
+                  --cluster-name ${params.cluster} \
+                  --query nodegroup.nodeRole \
+                  --output text
               """).trim()
 
             role = roleArn.split('/')[1]
 
             sh """
+              aws eks update-kubeconfig --name ${params.cluster} --region ${params.region}
               aws iam detach-role-policy --role-name ${role} --policy-arn arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy || true
 
-              [ -d kubernetes-ingress ] && rm -rf kubernetes-ingress
-              git clone https://github.com/nginxinc/kubernetes-ingress.git
-
-              # Need to clean this up otherwise the vpc can't be deleted
-              kubectl delete -f kubernetes-ingress/deployments/service/loadbalancer-aws-elb.yaml || true
-              [ -d kubernetes-ingress ] && rm -rf kubernetes-ingress
+              # Some of these helm charts may not be installed; just try and remove them anyway
+              helm uninstall nginx-ingress --namespace nginx-ingress || true
+              helm uninstall cert-manager --namespace cert-manager || true
+              kubectl delete -f nginx-ingress-proxy.yaml || true
+              helm uninstall nginx-ingress --namespace nginx-ingress || true
               sleep 20
-            """
 
-            sh """
               eksctl delete cluster \
                 --name ${params.cluster} \
                 --region ${params.region} \
