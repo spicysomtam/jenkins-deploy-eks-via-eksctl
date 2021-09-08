@@ -264,7 +264,6 @@ pipeline {
               aws iam detach-role-policy --role-name ${role} --policy-arn arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy || true
 
               # Some of these helm charts may not be installed; just try and remove them anyway
-              helm uninstall nginx-ingress --namespace nginx-ingress || true
               helm uninstall cert-manager --namespace cert-manager || true
               kubectl delete -f nginx-ingress-proxy.yaml || true
               helm uninstall nginx-ingress --namespace nginx-ingress || true
