@@ -114,7 +114,7 @@ Prometheus is a common performance scraper used by various monitoring tools (my 
 
 ## kubernetes dashboard
 
-This is a popular gui for those new to k8s or those without access to the command line and kubectl. This can now be installed via the Jenkins pipeline
+This is a popular gui for those new to k8s or those without access to the command line and kubectl. This can now be installed via the Jenkins pipeline.
 
 ## Populating the aws-auth configmap with admin users
 
