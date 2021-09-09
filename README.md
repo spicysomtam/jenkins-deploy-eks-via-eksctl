@@ -14,8 +14,6 @@ I might also add that I don't like EKS much; it has too many issues and edge cas
 
 There are lots of options for `eksctl`; most of this is documented at [eksctl.io](https://eksctl.io), although you might want to issue `--help` against the latest binary to see what options are available.
 
-![Screenshot of the parameters](Jenkins.png)
-
 # EKS notes
 ## Fargate
 
@@ -65,7 +63,16 @@ You can create multiple eks clusters/stacks by simply specifying a different clu
 
 If a `create` goes wrong, simply re-run it for the same cluster name, but choose `destroy`, which will clean it down. Conversly you do the `destroy` when you want to tear down the stack.
 
-![Screenshot of the parameters](Jenkins.png).
+## Summary of features and options available via the Jenkins pipeline
+
+We can automatically install these features:
+* Cloudwatch logging: all cluster backplane logging goes into cloudwatch. Enabled by default.
+* Cloudwatch metrics and container insights. This can cost alot of money in terms of aws bills. Thus its default is disabled. Use metrics-server and prometheus instead (and these are better imho).
+* Kubernetes dashboard. Some people like this, especially if you are new to k8s, or don't have access to the command line. I would recommend k8s Lens instead, which is a client side program. By default its disabled.
+* Prometheus metrics scraper. This is used by various monitoring software (including Lens). By default its enabled
+* nginx-ingress. This is discussed elsewhere. Enable an ingress controller, which is extremly useful and thus enabled by default.
+* Cluster autoscaler. Spin up and down nodes depending on whether pods are not scheduled (eg the cluster runs out of resources). Only enable for prod deploys and thus disabled by default.
+* cert-manager. Automatically manage TLS certs in k8s. Very useful for free Letsencrypt certs (but also works for others such as Godaddy, etc). Disabled by default.
 
 ## Kubernetes version can be specified
 
@@ -98,6 +105,16 @@ All you then need to do is point a dns cname record at the load balancer, create
 Note: Staging certs won't pass validation on most web browsers while prod ones do. Be aware that prod ones are throttled and controlled more stringely than staging ones; thus why you need to get the staging working first, which will allow you to troubleshoot issues, etc.
 
 See cert manager docs for full details.
+
+## Monitoring and metrics to allow horizontal and vertical pod autoscaling
+
+The horizontal and vertical pod autoscalers need cpu and memory metrics to allow these to operate so you need the metrics-server to be installed for these, which is an option in the Jenkins pipeline.
+
+Prometheus is a common performance scraper used by various monitoring tools (my favourite is k8s Lens); this can now be setup via the Jenkins pipeline.
+
+## kubernetes dashboard
+
+This is a popular gui for those new to k8s or those without access to the command line and kubectl. This can now be installed via the Jenkins pipeline
 
 ## Populating the aws-auth configmap with admin users
 
