@@ -5,7 +5,7 @@ pipeline {
    parameters {
     choice(name: 'action', choices: 'create\ndestroy', description: 'Create/update or destroy the eks cluster.')
     string(name: 'cluster', defaultValue : 'demo', description: "EKS cluster name.")
-    choice(name: 'k8s_version', choices: '1.21\n1.20\n1.19\n1.18\n1.17\n1.16', description: 'K8s version to install.')
+    choice(name: 'k8s_version', choices: '1.22\n1.23\n1.24\n1.25\n1.26', description: 'K8s version to install.')
     string(name: 'instance_type', defaultValue : 'm5.large', description: "k8s worker node instance type.")
     string(name: 'num_workers', defaultValue : '3', description: "k8s number of worker instances.")
     string(name: 'max_workers', defaultValue : '10', description: "k8s maximum number of worker instances that can be scaled.")
@@ -13,14 +13,14 @@ pipeline {
     string(name: 'credential', defaultValue : 'jenkins', description: "Jenkins credential that provides the AWS access key and secret.")
     booleanParam(name: 'cw_logs', defaultValue : true, description: "Setup Cloudwatch logging?")
     booleanParam(name: 'cw_metrics', defaultValue : false, description: "Setup Cloudwatch metrics and Container Insights?")
-    booleanParam(name: 'metrics_server', defaultValue : true, description: "Setup k8s metrics-server?")
+    booleanParam(name: 'metrics_server', defaultValue : false, description: "Setup k8s metrics-server?")
     booleanParam(name: 'dashboard', defaultValue : false, description: "Setup k8s dashboard?")
-    booleanParam(name: 'prometheus', defaultValue : true, description: "Setup k8s prometheus?")
+    booleanParam(name: 'prometheus', defaultValue : false, description: "Setup k8s prometheus?")
     booleanParam(name: 'nginx_ingress', defaultValue : true, description: "Setup nginx ingress and load balancer?")
     booleanParam(name: 'ca', defaultValue : false, description: "Setup k8s Cluster Autoscaler?")
     booleanParam(name: 'cert_manager', defaultValue : false, description: "Setup cert-manager for certificate handling?")
     string(name: 'region', defaultValue : 'eu-west-1', description: "AWS region.")
-    string(name: 'key_pair', defaultValue : 'spicysomtam-aws7', description: "EC2 instance ssh keypair.")
+    string(name: 'key_pair', defaultValue : 'spicysomtam', description: "EC2 instance ssh keypair.")
   }
 
   options {
@@ -208,6 +208,8 @@ pipeline {
 
               // CA image tag, which is k8s major version plus CA minor version.
               // See for latest versions: https://github.com/kubernetes/autoscaler/releases
+              tag='0'
+              /*
               switch (params.k8s_version) {
                 case '1.21':
                   tag='0'
@@ -228,6 +230,7 @@ pipeline {
                   tag='7'
                   break;
               }
+               */
 
               // Setup documented here: https://docs.aws.amazon.com/eks/latest/userguide/cluster-autoscaler.html
               // Note the eksctl arg --asg-access sets up an inline policy for the node group with the required ASG permissions as per docs above (the docs are out of date).
